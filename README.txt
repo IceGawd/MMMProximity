@@ -1,7 +1,7 @@
 Init:
 
 npm init -y
-npm install ws express simple-peer
+npm install ws express simple-peer uuid
 
 Run:
 

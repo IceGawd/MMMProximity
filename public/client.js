@@ -1,54 +1,74 @@
-let peer;
 let socket;
-let pendingSignal;
-window.audio = null;
+let myId;
+const peers = new Map(); // id -> SimplePeer
+const audioElements = new Map(); // id -> Audio
 
-function start(isInitiator) {
+function start() {
 	socket = new WebSocket('ws://' + location.host);
 
 	socket.onmessage = async (event) => {
-		let signal;
+		const data = JSON.parse(event.data);
 
-		if (event.data instanceof Blob) {
-			const text = await event.data.text();
-			signal = JSON.parse(text);
-		} else {
-			signal = JSON.parse(event.data);
-		}
-
-		// If peer isn't ready yet, store the signal to apply later
-		if (!peer) {
-			console.log("Peer not ready, storing pending signal");
-			pendingSignal = signal;
-		} else {
-			peer.signal(signal);
+		if (data.type === 'init') {
+			myId = data.id;
+			data.peers.forEach(peerId => {
+				connectToPeer(peerId, true); // initiator for existing
+			});
+		} else if (data.type === 'new-peer') {
+			connectToPeer(data.id, false); // new peer, not initiator
+		} else if (data.type === 'signal') {
+			if (peers.has(data.from)) {
+				peers.get(data.from).signal(data.signal);
+			} else {
+				console.warn('Signal for unknown peer', data.from);
+			}
+		} else if (data.type === 'peer-disconnect') {
+			if (peers.has(data.id)) {
+				peers.get(data.id).destroy();
+				peers.delete(data.id);
+				audioElements.get(data.id)?.remove();
+				audioElements.delete(data.id);
+			}
 		}
 	};
+}
 
+function connectToPeer(peerId, initiator) {
 	navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-		peer = new SimplePeer({ initiator: isInitiator, trickle: false, stream });
+		const peer = new SimplePeer({ initiator, trickle: false, stream });
+		peers.set(peerId, peer);
 
-		if (pendingSignal) {
-			console.log("Applying stored signal");
-			peer.signal(pendingSignal);
-			pendingSignal = null;
-		}
-
-		peer.on('signal', data => {
-			socket.send(JSON.stringify(data));
+		peer.on('signal', signal => {
+			socket.send(JSON.stringify({
+				type: 'signal',
+				target: peerId,
+				signal
+			}));
 		});
 
 		peer.on('stream', remoteStream => {
-			console.log("Received remote stream!");
-
 			const audio = new Audio();
 			audio.srcObject = remoteStream;
-			audio.volume = 1.0;
 			audio.autoplay = true;
-			audio.play();
+			audio.volume = 1.0;
+			document.body.appendChild(audio);
+			audioElements.set(peerId, audio);
+		});
 
-			window.audio = audio;
+		peer.on('close', () => {
+			console.log('Peer closed:', peerId);
+			audioElements.get(peerId)?.remove();
+			audioElements.delete(peerId);
+			peers.delete(peerId);
+		});
+
+		peer.on('error', err => {
+			console.error('Peer error:', peerId, err);
 		});
 	});
+}
 
+function setVolumeForPeer(peerId, volume) {
+	const audio = audioElements.get(peerId);
+	if (audio) audio.volume = volume;
 }
