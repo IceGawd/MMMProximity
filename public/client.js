@@ -1,5 +1,6 @@
 let peer;
 let socket;
+window.audio = null;
 
 function start(isInitiator) {
 	socket = new WebSocket('ws://' + location.host);
@@ -21,17 +22,19 @@ function start(isInitiator) {
 		peer = new SimplePeer({ initiator: isInitiator, trickle: false, stream });
 
 		peer.on('signal', data => {
-			console.log("signal");
-
 			socket.send(JSON.stringify(data));
 		});
 
 		peer.on('stream', remoteStream => {
-			console.log("stream");
+			console.log("Received remote stream!");
 
 			const audio = new Audio();
 			audio.srcObject = remoteStream;
+			audio.volume = 1.0;
+			audio.autoplay = true;
 			audio.play();
+
+			window.audio = audio;
 		});
 	});
 }
