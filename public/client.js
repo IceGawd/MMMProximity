@@ -1,5 +1,6 @@
 let peer;
 let socket;
+let pendingSignal;
 window.audio = null;
 
 function start(isInitiator) {
@@ -15,11 +16,23 @@ function start(isInitiator) {
 			signal = JSON.parse(event.data);
 		}
 
-		peer.signal(signal);
+		// If peer isn't ready yet, store the signal to apply later
+		if (!peer) {
+			console.log("Peer not ready, storing pending signal");
+			pendingSignal = signal;
+		} else {
+			peer.signal(signal);
+		}
 	};
 
 	navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
 		peer = new SimplePeer({ initiator: isInitiator, trickle: false, stream });
+
+		if (pendingSignal) {
+			console.log("Applying stored signal");
+			peer.signal(pendingSignal);
+			pendingSignal = null;
+		}
 
 		peer.on('signal', data => {
 			socket.send(JSON.stringify(data));
@@ -37,4 +50,5 @@ function start(isInitiator) {
 			window.audio = audio;
 		});
 	});
+
 }
