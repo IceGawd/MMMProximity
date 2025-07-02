@@ -34,7 +34,17 @@ function start() {
 }
 
 function connectToPeer(peerId, initiator) {
-	navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+	navigator.mediaDevices.getUserMedia({
+		audio: {
+			autoGainControl: false,
+			noiseSuppression: false,
+			echoCancellation: false,
+			channelCount: 1,
+			sampleRate: 48000, // optional but sometimes helps
+			sampleSize: 16,
+		},
+		video: false
+	}).then(stream => {
 		const peer = new SimplePeer({ initiator, trickle: false, stream });
 		peers.set(peerId, peer);
 
