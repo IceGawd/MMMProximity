@@ -4,7 +4,7 @@ const peers = new Map(); // id -> SimplePeer
 const audioElements = new Map(); // id -> Audio
 
 function start() {
-	socket = new WebSocket('ws://' + location.host);
+	socket = new WebSocket('wss://' + location.host);
 
 	socket.onmessage = async (event) => {
 		const data = JSON.parse(event.data);

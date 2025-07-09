@@ -1,10 +1,17 @@
+const fs = require('fs');
 const express = require('express');
 const WebSocket = require('ws');
-const http = require('http');
+const https = require('https');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const server = http.createServer(app);
+
+const options = {
+	key: fs.readFileSync('./key.pem'),
+	cert: fs.readFileSync('./cert.pem'),
+};
+
+const server = https.createServer(options, app);
 const wss = new WebSocket.Server({ server });
 const os = require('os');
 const interfaces = os.networkInterfaces();
@@ -72,6 +79,6 @@ function broadcastExcept(excludeId, msg) {
 
 server.listen(3000, () => {
 	console.log(`Server running on:`);
-	console.log(` - Local:  http://localhost:3000`);
-	console.log(` - Remote: http://${externalIP}:3000`);
+	console.log(` - Local:  https://localhost:3000`);
+	console.log(` - Remote: https://${externalIP}:3000`);
 });
