@@ -4,7 +4,18 @@ const peers = new Map(); // id -> SimplePeer
 const audioElements = new Map(); // id -> Audio
 
 function start() {
-	socket = new WebSocket('wss://' + location.host);
+	const username = document.getElementById('usernameInput').value || 'Anonymous';
+	window.username = username; // Save it globally in case you need it later
+
+	const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+	socket = new WebSocket(protocol + location.host);
+
+	socket.onopen = () => {
+		socket.send(JSON.stringify({
+			type: 'username',
+			data: username
+		}));
+	};
 
 	socket.onmessage = async (event) => {
 		const data = JSON.parse(event.data);

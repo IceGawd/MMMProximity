@@ -29,12 +29,12 @@ for (const iface of Object.values(interfaces)) {
 
 app.use(express.static('public'));
 
-const clients = new Map(); // id -> { ws, signalBuffer }
+const clients = new Map(); // id -> { ws, signalBuffer, username }
 
 wss.on('connection', (ws) => {
 	const id = uuidv4();
 	console.log(`Client connected: ${id}`);
-	clients.set(id, { ws, signalBuffer: {} });
+	clients.set(id, { ws, signalBuffer: {}, username: null });
 
 	// Notify new client of all existing clients
 	const existingIds = Array.from(clients.keys()).filter(i => i !== id);
@@ -52,7 +52,17 @@ wss.on('connection', (ws) => {
 			return;
 		}
 
-		// Relay signal to specific target
+		// Username assignment
+		if (data.type === 'username') {
+			const client = clients.get(id);
+			if (client) {
+				client.username = data.data;
+				console.log(`Username for ${id} is ${data.data}`);
+			}
+			return; // Don't broadcast username messages
+		}
+
+		// Signal relay
 		if (data.type === 'signal' && data.target && clients.has(data.target)) {
 			clients.get(data.target).ws.send(JSON.stringify({
 				type: 'signal',
@@ -63,7 +73,7 @@ wss.on('connection', (ws) => {
 	});
 
 	ws.on('close', () => {
-		console.log(`Client disconnected: ${id}`);
+		console.log(`Client disconnected: ${id} (${clients.get(id)?.username || 'unknown'})`);
 		clients.delete(id);
 		broadcastExcept(id, JSON.stringify({ type: 'peer-disconnect', id }));
 	});
