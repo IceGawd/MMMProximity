@@ -3,6 +3,7 @@ const express = require('express');
 const WebSocket = require('ws');
 const https = require('https');
 const { v4: uuidv4 } = require('uuid');
+const bodyParser = require('body-parser');
 
 const app = express();
 
@@ -28,6 +29,39 @@ for (const iface of Object.values(interfaces)) {
 
 
 app.use(express.static('public'));
+
+app.use(bodyParser.json());
+
+app.post('/volume-matrix', (req, res) => {
+	const { usernames, matrix } = req.body;
+
+	console.log('Received volume matrix!');
+	console.log('Players:', usernames);
+	console.log('Matrix:', matrix);
+
+	/*
+	// Broadcast to all clients
+	for (const [id, client] of clients.entries()) {
+		if (client.ws.readyState === WebSocket.OPEN && client.username) {
+			const index = usernames.indexOf(client.username);
+			if (index !== -1) {
+				// Build list of volume values this user should hear
+				const volumes = {};
+				for (let j = 0; j < usernames.length; j++) {
+					if (j !== index) volumes[usernames[j]] = matrix[index][j];
+				}
+
+				client.ws.send(JSON.stringify({
+					type: 'volume',
+					data: volumes
+				}));
+			}
+		}
+	}
+	*/
+
+	res.sendStatus(200);
+});
 
 const clients = new Map(); // id -> { ws, signalBuffer, username }
 
