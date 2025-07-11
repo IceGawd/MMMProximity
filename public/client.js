@@ -56,7 +56,7 @@ function connectToPeer(peerId, initiator) {
 		audio: {
 			autoGainControl: true,
 			noiseSuppression: false,
-			echoCancellation: false,
+			echoCancellation: true,
 			channelCount: 1,
 			sampleRate: 48000, // optional but sometimes helps
 			sampleSize: 16,
