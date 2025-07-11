@@ -39,7 +39,6 @@ app.post('/volume-matrix', (req, res) => {
 	console.log('Players:', usernames);
 	console.log('Matrix:', matrix);
 
-	/*
 	// Broadcast to all clients
 	for (const [id, client] of clients.entries()) {
 		if (client.ws.readyState === WebSocket.OPEN && client.username) {
@@ -48,17 +47,18 @@ app.post('/volume-matrix', (req, res) => {
 				// Build list of volume values this user should hear
 				const volumes = {};
 				for (let j = 0; j < usernames.length; j++) {
-					if (j !== index) volumes[usernames[j]] = matrix[index][j];
+					if (j !== index) volumes[getIdFromUsername(usernames[j])] = matrix[index][j];
 				}
 
 				client.ws.send(JSON.stringify({
 					type: 'volume',
-					data: volumes
+					volumes: volumes
 				}));
+
+				console.log(volumes)
 			}
 		}
 	}
-	*/
 
 	res.sendStatus(200);
 });
@@ -120,6 +120,16 @@ function broadcastExcept(excludeId, msg) {
 		}
 	}
 }
+
+function getIdFromUsername(targetUsername) {
+	for (const [id, clientData] of clients.entries()) {
+		if (clientData.username === targetUsername) {
+			return id;
+		}
+	}
+	return null;
+}
+
 
 server.listen(3000, () => {
 	console.log(`Server running on:`);

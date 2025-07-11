@@ -2,44 +2,22 @@
 <html>
 <head>
 	<title>Proximity Voice Test</title>
+	<link rel="icon" href="/favicon.ico" type="image/x-icon">
 </head>
 <body>
 	<h1>Voice Test</h1>
 
-	<label>
-		<input type="checkbox" id="initiatorToggle" />
-		Are you the initiator?
-	</label>
-	<br><br>
-
 	<input type="text" id="usernameInput" placeholder="Enter your username" />
 	<button onclick="joinVoice()">Join Voice</button>
-
-	<label>Volume:
-		<input type="range" min="0" max="1" step="0.01" value="1" oninput="setVolume(this.value)" />
-	</label>
-
 
 	<p id="status"></p>
 
 	<script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
 	<script src="client.js"></script>
 	<script>
-		function setVolume(v) {
-			if (window.audio) {
-				window.audio.volume = v;
-			}
-			else {
-				console.log("no audio");
-			}
-		}
-
 		function joinVoice() {
-			const isInitiator = document.getElementById("initiatorToggle").checked;
-			document.getElementById("status").textContent = isInitiator
-				? "Joining as initiator..."
-				: "Joining as responder...";
-			start(isInitiator);
+			document.getElementById("status").textContent = "Joining..."
+			start();
 		}
 	</script>
 </body>

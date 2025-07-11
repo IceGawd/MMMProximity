@@ -2,6 +2,7 @@ let socket;
 let myId;
 const peers = new Map(); // id -> SimplePeer
 const audioElements = new Map(); // id -> Audio
+const unusedSignals = new Map(); // id -> Signal
 
 function start() {
 	const username = document.getElementById('usernameInput').value || 'Anonymous';
@@ -20,7 +21,12 @@ function start() {
 	socket.onmessage = async (event) => {
 		const data = JSON.parse(event.data);
 
-		if (data.type === 'init') {
+		if (data.type === 'volume') {
+			for (const [id, volume] of Object.entries(data.volumes)) {
+				setVolumeForPeer(id, volume);
+			}
+		}
+		else if (data.type === 'init') {
 			myId = data.id;
 			data.peers.forEach(peerId => {
 				connectToPeer(peerId, true); // initiator for existing
@@ -31,7 +37,8 @@ function start() {
 			if (peers.has(data.from)) {
 				peers.get(data.from).signal(data.signal);
 			} else {
-				console.warn('Signal for unknown peer', data.from);
+				unusedSignals.set(data.from, data.signal);
+				console.warn('Signal for unknown peer, being saved: ', data.from);
 			}
 		} else if (data.type === 'peer-disconnect') {
 			if (peers.has(data.id)) {
@@ -47,7 +54,7 @@ function start() {
 function connectToPeer(peerId, initiator) {
 	navigator.mediaDevices.getUserMedia({
 		audio: {
-			autoGainControl: false,
+			autoGainControl: true,
 			noiseSuppression: false,
 			echoCancellation: false,
 			channelCount: 1,
@@ -73,6 +80,7 @@ function connectToPeer(peerId, initiator) {
 			audio.autoplay = true;
 			audio.volume = 1.0;
 			document.body.appendChild(audio);
+			document.getElementById("status").textContent = "Connected!";
 			audioElements.set(peerId, audio);
 		});
 
@@ -86,6 +94,14 @@ function connectToPeer(peerId, initiator) {
 		peer.on('error', err => {
 			console.error('Peer error:', peerId, err);
 		});
+
+		if (unusedSignals.has(peerId)) {
+			console.warn('Signalling saved peer: ', peerId);
+
+			const signal = unusedSignals.get(peerId);
+			peers.get(peerId).signal(signal);
+			unusedSignals.delete(peerId);
+		}
 	});
 }
 
