@@ -4,6 +4,32 @@ const peers = new Map(); // id -> SimplePeer
 const audioElements = new Map(); // id -> Audio
 const unusedSignals = new Map(); // id -> Signal
 
+const volumeSlider = document.getElementById("volumeSlider");
+const disconnectButton = document.getElementById("disconnectButton");
+
+let localVolumeMultiplier = 1;
+
+volumeSlider.addEventListener("input", () => {
+	localVolumeMultiplier = parseFloat(volumeSlider.value);
+	document.getElementById("volumeValue").textContent = localVolumeMultiplier;
+	for (const [peerId, audio] of audioElements.entries()) {
+		if (audio.gainNode) audio.gainNode.gain.value = localVolumeMultiplier;
+	}
+});
+
+disconnectButton.addEventListener("click", () => {
+	if (socket) socket.close();
+	for (const peer of peers.values()) peer.destroy();
+	peers.clear();
+	audioElements.forEach(({ source, panner, gainNode }) => {
+		if (gainNode) gainNode.disconnect();
+		if (panner) panner.disconnect();
+		if (source) source.disconnect();
+	});
+	audioElements.clear();
+	document.getElementById("status").textContent = "Disconnected.";
+});
+
 document.getElementById("startButton").addEventListener("click", async () => {
 	audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 	await audioCtx.resume();
@@ -167,7 +193,7 @@ async function connectToPeer(peerId, initiator) {
 function setVolumeForPeer(peerId, volume, panner) {
 	const audioObj = audioElements.get(peerId);
 	if (audioObj) {
-		audioObj.gain.gain.value = volume;
+		audioObj.gain.gain.value = volume * localVolumeMultiplier;
 		audioObj.panner.pan.value = panner;
 	}
 }
