@@ -1,0 +1,39 @@
+<button id="startButton">Simulate Remote Audio</button>
+<script>
+let audioCtx;
+let source;
+let panner;
+
+document.getElementById("startButton").addEventListener("click", async () => {
+	audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+	await audioCtx.resume();
+
+	const localStream = await navigator.mediaDevices.getUserMedia({
+		audio: {
+			autoGainControl: true,
+			noiseSuppression: false,
+			echoCancellation: false,
+			channelCount: 1,
+			sampleRate: 48000,
+			sampleSize: 16,
+		},
+		video: false
+	});
+
+	// Simulate remoteStream (like you got it from SimplePeer)
+	const remoteStream = new MediaStream();
+	for (const track of localStream.getAudioTracks()) {
+		remoteStream.addTrack(track);
+	}
+
+	source = audioCtx.createMediaStreamSource(remoteStream);
+
+	panner = audioCtx.createStereoPanner();
+	panner.pan.value = 1; // pan right
+
+	source.connect(panner);
+	panner.connect(audioCtx.destination);
+
+	console.log("Remote-style stream piped into audio context.");
+});
+</script>

@@ -4,9 +4,17 @@ const peers = new Map(); // id -> SimplePeer
 const audioElements = new Map(); // id -> Audio
 const unusedSignals = new Map(); // id -> Signal
 
-function start() {
+document.getElementById("startButton").addEventListener("click", async () => {
+	audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+	await audioCtx.resume();
+
+	document.getElementById("status").textContent = "Joining...";
+	await start();
+});
+
+async function start() {
 	const username = document.getElementById('usernameInput').value || 'Anonymous';
-	window.username = username; // Save it globally in case you need it later
+	window.username = username;
 
 	const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
 	socket = new WebSocket(protocol + location.host);
@@ -22,90 +30,163 @@ function start() {
 		const data = JSON.parse(event.data);
 
 		if (data.type === 'volume') {
-			for (const [id, volume] of Object.entries(data.volumes)) {
-				setVolumeForPeer(id, volume);
+			for (const [id, dict] of Object.entries(data.volumes)) {
+				setVolumeForPeer(id, dict["volume"], dict["panner"]);
 			}
 		}
 		else if (data.type === 'init') {
 			myId = data.id;
-			data.peers.forEach(peerId => {
-				connectToPeer(peerId, true); // initiator for existing
-			});
-		} else if (data.type === 'new-peer') {
-			connectToPeer(data.id, false); // new peer, not initiator
-		} else if (data.type === 'signal') {
+
+			// Use for...of instead of forEach + await
+			for (const peerId of data.peers) {
+				await connectToPeer(peerId, true);
+			}
+		}
+		else if (data.type === 'new-peer') {
+			await connectToPeer(data.id, false);
+		}
+		else if (data.type === 'signal') {
 			if (peers.has(data.from)) {
 				peers.get(data.from).signal(data.signal);
 			} else {
 				unusedSignals.set(data.from, data.signal);
 				console.warn('Signal for unknown peer, being saved: ', data.from);
 			}
-		} else if (data.type === 'peer-disconnect') {
+		}
+		else if (data.type === 'peer-disconnect') {
 			if (peers.has(data.id)) {
 				peers.get(data.id).destroy();
-				peers.delete(data.id);
-				audioElements.get(data.id)?.remove();
-				audioElements.delete(data.id);
+				removePeerThings(data.id);
 			}
 		}
 	};
 }
 
-function connectToPeer(peerId, initiator) {
-	navigator.mediaDevices.getUserMedia({
+async function connectToPeer(peerId, initiator) {
+	const stream = await navigator.mediaDevices.getUserMedia({
 		audio: {
 			autoGainControl: true,
 			noiseSuppression: false,
-			echoCancellation: true,
+			echoCancellation: false,
 			channelCount: 1,
-			sampleRate: 48000, // optional but sometimes helps
+			sampleRate: 48000,
 			sampleSize: 16,
 		},
 		video: false
-	}).then(stream => {
-		const peer = new SimplePeer({ initiator, trickle: false, stream });
-		peers.set(peerId, peer);
+	});
 
-		peer.on('signal', signal => {
-			socket.send(JSON.stringify({
-				type: 'signal',
-				target: peerId,
-				signal
-			}));
-		});
+	const peer = new SimplePeer({ initiator, trickle: false, stream });
+	peers.set(peerId, peer);
 
-		peer.on('stream', remoteStream => {
+	peer.on('signal', signal => {
+		socket.send(JSON.stringify({
+			type: 'signal',
+			target: peerId,
+			signal
+		}));
+	});
+
+	peer.on('stream', remoteStream => {
+		// console.log("Remote stream received:", remoteStream);
+		// console.log("Audio tracks:", remoteStream.getAudioTracks());
+		// console.log("Track enabled?", remoteStream.getAudioTracks()[0]?.enabled);
+		// console.log("Track muted?", remoteStream.getAudioTracks()[0]?.muted);
+
+		// /*
+
+		document.getElementById("status").textContent = "Waiting for Stream...";
+
+		remoteStream.getAudioTracks()[0].onunmute = () => {
+			// /*
 			const audio = new Audio();
 			audio.srcObject = remoteStream;
 			audio.autoplay = true;
-			audio.volume = 1.0;
+			audio.volume = 0;
 			document.body.appendChild(audio);
+			document.getElementById("status").textContent = "Audio Connected, waiting for CTX...";
+			// */
+
+			// console.log("Track is now unmuted!");
+			// console.log("Track muted?", remoteStream.getAudioTracks()[0]?.muted);
+
+			const tracks = remoteStream.getAudioTracks();
+			// console.log("Tracks:", tracks.length);
+			// console.log("Track readyState:", tracks[0]?.readyState);
+
+			const source = audioCtx.createMediaStreamSource(remoteStream);
+
+			const gain = audioCtx.createGain();
+			gain.gain.value = 1.0;
+
+			const panner = audioCtx.createStereoPanner();
+			panner.pan.value = 0;
+
+			source.connect(gain);
+			gain.connect(panner);
+			panner.connect(audioCtx.destination);
+			audioElements.set(peerId, { source , gain , panner });
+
+			// console.log("State of AudioContext:", audioCtx.state);
 			document.getElementById("status").textContent = "Connected!";
-			audioElements.set(peerId, audio);
-		});
+		};
 
-		peer.on('close', () => {
-			console.log('Peer closed:', peerId);
-			audioElements.get(peerId)?.remove();
-			audioElements.delete(peerId);
-			peers.delete(peerId);
-		});
+		// */
 
-		peer.on('error', err => {
-			console.error('Peer error:', peerId, err);
-		});
+		/*
+		const testOsc = audioCtx.createOscillator();
+		testOsc.frequency.value = 440;
 
-		if (unusedSignals.has(peerId)) {
-			console.warn('Signalling saved peer: ', peerId);
+		const panner = audioCtx.createStereoPanner();
+		panner.pan.value = 1;
 
-			const signal = unusedSignals.get(peerId);
-			peers.get(peerId).signal(signal);
-			unusedSignals.delete(peerId);
-		}
+		testOsc.connect(panner);
+		panner.connect(audioCtx.destination);
+		testOsc.start();
+		setTimeout(() => testOsc.stop(), 1000);
+		// */
 	});
+
+	peer.on('close', () => {
+		console.log('Peer closed:', peerId);
+		removePeerThings(peerId);
+	});
+
+	peer.on('error', err => {
+		console.error('Peer error:', peerId, err);
+	});
+
+	if (unusedSignals.has(peerId)) {
+		console.warn('Signalling saved peer: ', peerId);
+
+		const signal = unusedSignals.get(peerId);
+		peers.get(peerId).signal(signal);
+		unusedSignals.delete(peerId);
+	}
 }
 
-function setVolumeForPeer(peerId, volume) {
-	const audio = audioElements.get(peerId);
-	if (audio) audio.volume = volume;
+function setVolumeForPeer(peerId, volume, panner) {
+	const audioObj = audioElements.get(peerId);
+	if (audioObj) {
+		audioObj.gain.gain.value = volume;
+		audioObj.panner.pan.value = panner;
+	}
+}
+
+function removePeerThings(peerId) {
+	const peer = peers.get(peerId);
+	if (peer) {
+		peers.delete(peerId);
+	}
+
+	const audioObj = audioElements.get(peerId);
+	if (audioObj) {
+		try {
+			audioObj.source?.disconnect();
+			audioObj.panner?.disconnect();
+			audioObj.gain?.disconnect();
+		} catch (e) {
+			console.warn("Failed to cleanly disconnect audio nodes for", peerId, e);
+		}
+		audioElements.delete(peerId);
+	}
 }

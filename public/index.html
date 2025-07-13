@@ -2,23 +2,17 @@
 <html>
 <head>
 	<title>Proximity Voice Test</title>
-	<link rel="icon" href="/favicon.ico" type="image/x-icon">
+	<link rel="icon" href="/favicon.ico?v=2" type="image/x-icon">
 </head>
 <body>
 	<h1>Voice Test</h1>
 
 	<input type="text" id="usernameInput" placeholder="Enter your username" />
-	<button onclick="joinVoice()">Join Voice</button>
+	<button id="startButton">Join Voice</button>
 
 	<p id="status"></p>
 
 	<script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
 	<script src="client.js"></script>
-	<script>
-		function joinVoice() {
-			document.getElementById("status").textContent = "Joining..."
-			start();
-		}
-	</script>
 </body>
 </html>

@@ -33,11 +33,13 @@ app.use(express.static('public'));
 app.use(bodyParser.json());
 
 app.post('/volume-matrix', (req, res) => {
-	const { usernames, matrix } = req.body;
+	let { usernames, matrix, pannerMatrix } = req.body;
+	usernames = usernames.map(str => str.toLowerCase());
 
 	console.log('Received volume matrix!');
 	console.log('Players:', usernames);
 	console.log('Matrix:', matrix);
+	console.log('Panner:', pannerMatrix);
 
 	// Broadcast to all clients
 	for (const [id, client] of clients.entries()) {
@@ -47,12 +49,15 @@ app.post('/volume-matrix', (req, res) => {
 				// Build list of volume values this user should hear
 				const volumes = {};
 				for (let j = 0; j < usernames.length; j++) {
-					if (j !== index) volumes[getIdFromUsername(usernames[j])] = matrix[index][j];
+					if (j !== index) {
+						const userid = getIdFromUsername(usernames[j]);
+						volumes[userid] = { "volume": matrix[index][j], "panner": pannerMatrix[index][j] };
+					}
 				}
 
 				client.ws.send(JSON.stringify({
 					type: 'volume',
-					volumes: volumes
+					volumes: volumes, 
 				}));
 
 				console.log(volumes)
@@ -90,7 +95,7 @@ wss.on('connection', (ws) => {
 		if (data.type === 'username') {
 			const client = clients.get(id);
 			if (client) {
-				client.username = data.data;
+				client.username = data.data.toLowerCase();
 				console.log(`Username for ${id} is ${data.data}`);
 			}
 			return; // Don't broadcast username messages
